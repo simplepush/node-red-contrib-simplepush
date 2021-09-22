@@ -1,0 +1,28 @@
+{
+  "name": "node-red-contrib-simplepush",
+  "version": "1.0.0",
+  "description": "Simplepush wrapper for Node-RED",
+  "dependencies": {
+    "simplepush-notifications": "^1.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/simplepush/node-red-contrib-simplepush.git"
+  },
+  "keywords": [
+    "node-red",
+    "simplepush",
+    "push notification",
+    "encrypted push notification"
+  ],
+  "node-red": {
+    "nodes": {
+      "simplepush": "simplepush.js"
+    }
+  },
+  "author": {
+    "name": "Timm Schäuble",
+    "email": "Timm.Schaeuble@gmail.com"
+  },
+  "homepage": "https://simplepush.io"
+}

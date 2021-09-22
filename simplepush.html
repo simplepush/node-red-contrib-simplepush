@@ -1,0 +1,57 @@
+<script type="text/javascript">
+    RED.nodes.registerType('simplepush',{
+        category: 'function',
+        color: '#ffaaaa',
+        defaults: {
+            key: {value:""},
+            title: {value:""},
+            message: {value:""},
+            event: {value:""},
+            password: {value:""},
+            salt: {value:""},
+            name: {value:""}
+        },
+        inputs:1,
+        outputs:0,
+        icon: "simplepush.svg",
+        label: function() {
+            return this.name||"simplepush";
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="simplepush">
+    <div class="form-row">
+        <label for="node-input-key"><i class="fa fa-tag"></i> Key</label>
+        <input type="text" id="node-input-key" placeholder="Key">
+    </div>
+    <div class="form-row">
+        <label for="node-input-title"><i class="fa fa-align-left"></i> Title</label>
+        <input type="text" id="node-input-title" placeholder="Leave blank will use msg.title">
+    </div>
+    <div class="form-row">
+        <label for="node-input-message"><i class="fa fa-align-left"></i> Message</label>
+        <input type="text" id="node-input-message" placeholder="Leave blank will use msg.payload">
+    </div>
+    <div class="form-row">
+        <label for="node-input-event"><i class="fa fa-align-left"></i> Event</label>
+        <input type="text" id="node-input-event" placeholder="Leave blank will use msg.event">
+    </div>
+    <div class="form-row">
+        <label for="node-input-password"><i class="fa fa-align-left"></i> Password</label>
+        <input type="text" id="node-input-password" placeholder="Leave blank will use msg.password and only for encrypted notifications">
+    </div>
+    <div class="form-row">
+        <label for="node-input-salt"><i class="fa fa-align-left"></i> Salt</label>
+        <input type="text" id="node-input-salt" placeholder="Leave blank will use msg.salt and only for encrypted notifications">
+    </div>
+    <br/>
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="simplepush">
+    <p>Uses Simplepush to push notifications or encrypted push notifications to Android and iOS devices that have Simplepush installed.</p>
+</script>
