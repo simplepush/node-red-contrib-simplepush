@@ -22,7 +22,7 @@ module.exports = function(RED) {
             if (config.password && config.salt || msg.password && msg.salt) {
                 notification = {
                     'key': config.key || msg.key,
-                    'title': config.title || msg.topic,
+                    'title': config.title || msg.title,
                     'message': config.message || msg.payload,
                     'event': config.event || msg.event,
                     'password': config.password || msg.password,
@@ -31,7 +31,7 @@ module.exports = function(RED) {
             } else {
                 notification = {
                     'key': config.key || msg.key,
-                    'title': config.title || msg.topic,
+                    'title': config.title || msg.title,
                     'message': config.message || msg.payload,
                     'event': config.event || msg.event
                 };
