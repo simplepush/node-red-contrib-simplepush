@@ -7,15 +7,33 @@
             title: {value:""},
             message: {value:""},
             event: {value:""},
+            actions: {value:""},
+            actionOutputEnabled: {value: false},
+            actionTimeout: {value:180},
             password: {value:""},
             salt: {value:""},
             name: {value:""}
         },
         inputs:1,
-        outputs:0,
+        outputs:1,
         icon: "simplepush.svg",
         label: function() {
             return this.name||"simplepush";
+        },
+        oneditprepare: function() {
+            if ($("#node-input-actionOutputEnabled").is(":checked")) {
+                $("#node-input-actionTimeout").prop("disabled", false);
+            } else {
+                $("#node-input-actionTimeout").prop("disabled", true);
+            }
+
+            $("#node-input-actionOutputEnabled").change(function() {
+                if ($("#node-input-actionOutputEnabled").is(":checked")) {
+                    $("#node-input-actionTimeout").prop("disabled", false);
+                } else {
+                    $("#node-input-actionTimeout").prop("disabled", true);
+                }
+            });
         }
     });
 </script>
@@ -38,12 +56,24 @@
         <input type="text" id="node-input-event" placeholder="Leave blank will use msg.event">
     </div>
     <div class="form-row">
+        <label for="node-input-actions"><i class="fa fa-align-left"></i> Feedback Actions</label>
+        <input type="text" id="node-input-actions" placeholder="Leave blank will use msg.actions">
+    </div>
+    <div class="form-row">
+        <label></label>
+        <input type="checkbox" id="node-input-actionOutputEnabled" style="margin-left: 0px; vertical-align: top; width: auto !important;"> <label style="width:auto !important;" for="node-input-actionOutputEnabled">Forward selected action to output</label>
+    </div>
+    <div class="form-row">
+        <label></label>
+        <input type="text" id="node-input-actionTimeout" style="margin-left: 0px; vertical-align: center; width: 50px !important;"> <label style="width:auto !important;" for="node-input-actionTimeout">Timeout in seconds</label>
+    </div>
+    <div class="form-row">
         <label for="node-input-password"><i class="fa fa-align-left"></i> Password</label>
-        <input type="text" id="node-input-password" placeholder="Leave blank will use msg.password and only for encrypted notifications">
+        <input type="password" id="node-input-password" placeholder="Leave blank will use msg.password and only for encrypted notifications">
     </div>
     <div class="form-row">
         <label for="node-input-salt"><i class="fa fa-align-left"></i> Salt</label>
-        <input type="text" id="node-input-salt" placeholder="Leave blank will use msg.salt and only for encrypted notifications">
+        <input type="password" id="node-input-salt" placeholder="Leave blank will use msg.salt and only for encrypted notifications">
     </div>
     <br/>
     <div class="form-row">

@@ -18,22 +18,41 @@ module.exports = function(RED) {
                 throw 'Simplepush error: key is empty'
             }
 
+            if (msg.actions && !(Array.isArray(msg.actions))) {
+                throw 'Simplepush error: actions must be array'
+            }
+
+            var configActions
+            if (config.actions) {
+                configActions = config.actions.split(/[ ,]+/).filter(Boolean)
+            }
+
+            if ((configActions && configActions > 10) || (msg.actions && msg.actions.length > 10)) {
+                throw 'Simplepush error: too many actions'
+            }
+
+            if ((config.actionTimeout && isNaN(parseInt(config.actionTimeout))) || (msg.timeout && isNaN(parseInt(msg.timeout)))) {
+                throw 'Simplepush error: feedback timeout needs to be a number'
+            }
+
             var notification;
             if (config.password && config.salt || msg.password && msg.salt) {
                 notification = {
-                    'key': config.key || msg.key,
-                    'title': config.title || msg.title,
-                    'message': config.message || msg.payload,
-                    'event': config.event || msg.event,
-                    'password': config.password || msg.password,
-                    'salt': config.salt || msg.salt
+                    key: config.key || msg.key,
+                    title: config.title || msg.title,
+                    message: config.message || msg.payload,
+                    event: config.event || msg.event,
+                    actions: configActions || msg.actions,
+                    password: config.password || msg.password,
+                    salt: config.salt || msg.salt
                 };
             } else {
                 notification = {
-                    'key': config.key || msg.key,
-                    'title': config.title || msg.title,
-                    'message': config.message || msg.payload,
-                    'event': config.event || msg.event
+                    key: config.key || msg.key,
+                    title: config.title || msg.title,
+                    message: config.message || msg.payload,
+                    event: config.event || msg.event,
+                    actions: configActions || msg.actions
                 };
             }
 
@@ -41,13 +60,36 @@ module.exports = function(RED) {
                 if (!notification[k]) { delete notification[k]; }
             }
 
-            simplepush.send(notification, function (err) {
-                if (err) {
-                    done(err.message);
-                }
+            var err = function (error) {
+                done(error)
+            }
 
-                done();
-            });
+            var feedbackCallback;
+            if (config.actionOutputEnabled || msg.timeout) {
+                feedbackCallback = function (response) {
+                    msg.payload = response.actionSelected
+                    msg.actionSelectedAt = response.actionSelectedAt
+                    msg.actionDeliveredAt = response.actionDeliveredAt
+                    msg.feedbackId = response.feedbackId
+                    send(msg)
+                };
+            } else {
+                feedbackCallback = null
+            }
+
+            var timeout;
+            if (parseInt(config.actionTimeout) == 0 || parseInt(msg.timeout) == 0) {
+                timeout = null
+            } else {
+                timeout = parseInt(config.actionTimeout) || parseInt(msg.timeout) || 180
+            }
+
+            simplepush.send(
+                notification,
+                err,
+                feedbackCallback,
+                timeout
+            );
         });
     }
     RED.nodes.registerType("simplepush", SimplepushNode);

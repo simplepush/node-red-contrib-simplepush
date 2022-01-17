@@ -21,6 +21,8 @@ Run the following command in your Node-RED user directory - typically `~/.node-r
 - `msg.key`: Simplepush key (can be found in the app) that identifies the device the notification is sent to
 - `msg.title`: The title of the notification
 - `msg.event`: The event of the notification
+- `msg.actions`: Array of strings that will be shown as notification actions
+- `msg.timeout`: Time in seconds after which a feedback timeout error will be thrown. Set this to 0 if there should be no timeout. Setting this will enable forwarding of the selected action to the output of the node.
 - `msg.password`: Password (can be set in the app) for encrypted notifications
 - `msg.salt`: Salt (can be found in the app) for encrypted notifications
 
