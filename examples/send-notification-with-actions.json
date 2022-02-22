@@ -1,0 +1,1 @@
+[{"id":"0e187fe3e24a115f","type":"simplepush","z":"1530ecf14c5fdbed","key":"YourKey","title":"","message":"","event":"","actions":"action1, action2, action3","actionOutputEnabled":true,"actionTimeout":"180","password":"","salt":"","name":"","x":430,"y":440,"wires":[["3ea81b30149abd8e","b4469b6821de043a","d081a05257e3f960","7d2885851e46337e"]]}]
