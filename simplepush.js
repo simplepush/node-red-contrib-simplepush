@@ -3,6 +3,7 @@ module.exports = function(RED) {
 
     function SimplepushNode(config) {
         RED.nodes.createNode(this, config);
+        this.actions = config.actions || "";
         var node = this;
 
         node.on('input', function(msg, send, done) {
@@ -27,7 +28,7 @@ module.exports = function(RED) {
                 configActions = config.actions.split(/[ ,]+/).filter(Boolean)
             }
 
-            if ((configActions && configActions > 10) || (msg.actions && msg.actions.length > 10)) {
+            if ((configActions && configActions.length > 10) || (msg.actions && msg.actions.length > 10)) {
                 throw 'Simplepush error: too many actions'
             }
 
@@ -65,13 +66,31 @@ module.exports = function(RED) {
             }
 
             var feedbackCallback;
-            if (config.actionOutputEnabled || msg.timeout) {
+            if (configActions || msg.actions) {
                 feedbackCallback = function (response) {
                     msg.payload = response.actionSelected
                     msg.actionSelectedAt = response.actionSelectedAt
                     msg.actionDeliveredAt = response.actionDeliveredAt
                     msg.feedbackId = response.feedbackId
-                    send(msg)
+
+                    if (configActions) {
+                        var index = configActions.indexOf(response.actionSelected)
+                        if (index != -1) {
+                            var outputMsgs = []
+                            for (var i=0; i < configActions.length; i++) {
+                                if (i == index) {
+                                    outputMsgs.push(msg)
+                                } else {
+                                    outputMsgs.push(null)
+                                }
+                            }
+                            send(outputMsgs)
+                            done()
+                        }
+                    } else {
+                        send(msg)
+                        done()
+                    }
                 };
             } else {
                 feedbackCallback = null

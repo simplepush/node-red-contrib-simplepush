@@ -8,32 +8,50 @@
             message: {value:""},
             event: {value:""},
             actions: {value:""},
-            actionOutputEnabled: {value: false},
             actionTimeout: {value:180},
             password: {value:""},
             salt: {value:""},
-            name: {value:""}
+            name: {value:""},
+            outputs: {value:1}
         },
         inputs:1,
         outputs:1,
+        outputLabels: function(index) {
+            if (this.actions !== "") {
+                actions = this.actions.split(/[ ,]+/).filter(Boolean);
+                return actions[index];
+            } else {
+                return "actionOutput";
+            }
+        },
         icon: "simplepush.svg",
         label: function() {
             return this.name||"simplepush";
         },
         oneditprepare: function() {
-            if ($("#node-input-actionOutputEnabled").is(":checked")) {
+            if ($("#node-input-actions").val() !== "") {
                 $("#node-input-actionTimeout").prop("disabled", false);
             } else {
                 $("#node-input-actionTimeout").prop("disabled", true);
             }
 
-            $("#node-input-actionOutputEnabled").change(function() {
-                if ($("#node-input-actionOutputEnabled").is(":checked")) {
+            $("#node-input-actions").on('input', function() {
+                if ($("#node-input-actions").val() !== "") {
                     $("#node-input-actionTimeout").prop("disabled", false);
                 } else {
                     $("#node-input-actionTimeout").prop("disabled", true);
                 }
             });
+        },
+        oneditsave: function() {
+            var node = this;
+            var actions = $("#node-input-actions").val();
+            if (actions !== "") {
+                actions = actions.split(/[ ,]+/).filter(Boolean);
+                node.outputs = actions.length > 10 ? 10 : actions.length;
+            } else {
+                node.outputs = 1;
+            }
         }
     });
 </script>
@@ -57,11 +75,7 @@
     </div>
     <div class="form-row">
         <label for="node-input-actions"><i class="fa fa-align-left"></i> Feedback Actions</label>
-        <input type="text" id="node-input-actions" placeholder="Leave blank will use msg.actions">
-    </div>
-    <div class="form-row">
-        <label></label>
-        <input type="checkbox" id="node-input-actionOutputEnabled" style="margin-left: 0px; vertical-align: top; width: auto !important;"> <label style="width:auto !important;" for="node-input-actionOutputEnabled">Forward selected action to output</label>
+        <input type="text" id="node-input-actions" placeholder="Actions separated by comma; Leave blank will use msg.actions">
     </div>
     <div class="form-row">
         <label></label>
@@ -83,5 +97,5 @@
 </script>
 
 <script type="text/html" data-help-name="simplepush">
-    <p>Uses Simplepush to push notifications or encrypted push notifications to Android and iOS devices that have Simplepush installed.</p>
+    <p>Uses Simplepush to push actionable and encryptable notifications to Android and iOS devices.</p>
 </script>
