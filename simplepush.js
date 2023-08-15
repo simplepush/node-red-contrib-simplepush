@@ -19,6 +19,19 @@ module.exports = function(RED) {
                 throw 'Simplepush error: key is empty'
             }
 
+            if (msg.attachments && !(Array.isArray(msg.attachments))) {
+                throw 'Simplepush error: attachments must be array'
+            }
+
+            var configAttachments
+            if (config.attachments) {
+                configAttachments = config.attachments.split(/[ ,]+/).filter(Boolean)
+            }
+
+            if ((configAttachments && configAttachments.length > 10) || (msg.attachments && msg.attachments.length > 10)) {
+                throw 'Simplepush error: too many attachments'
+            }
+
             if (msg.actions && !(Array.isArray(msg.actions))) {
                 throw 'Simplepush error: actions must be array'
             }
@@ -42,6 +55,7 @@ module.exports = function(RED) {
                     key: config.key || msg.key,
                     title: config.title || msg.title,
                     message: config.message || msg.payload,
+                    attachments: configAttachments || msg.attachments,
                     event: config.event || msg.event,
                     actions: configActions || msg.actions,
                     password: config.password || msg.password,
@@ -52,6 +66,7 @@ module.exports = function(RED) {
                     key: config.key || msg.key,
                     title: config.title || msg.title,
                     message: config.message || msg.payload,
+                    attachments: configAttachments || msg.attachments,
                     event: config.event || msg.event,
                     actions: configActions || msg.actions
                 };
