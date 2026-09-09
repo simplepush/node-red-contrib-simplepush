@@ -3,17 +3,27 @@
         category: 'function',
         color: '#ffaaaa',
         defaults: {
-            key: {value:""},
+            topic: {value:""},
             title: {value:""},
             message: {value:""},
             attachments: {value:""},
-            event: {value:""},
+            tag: {value:""},
             actions: {value:""},
-            actionTimeout: {value:180},
-            password: {value:""},
-            salt: {value:""},
+            actionTimeout: {value:0},
+            autoCommit: {value:true},
             name: {value:""},
-            outputs: {value:1}
+            outputs: {value:1},
+            // Properties of flows saved by version 1.x. Kept so a deploy does
+            // not drop them; the edit dialog moves them into the new fields.
+            key: {value:""},
+            event: {value:""},
+            password: {value:""},
+            salt: {value:""}
+        },
+        credentials: {
+            apiToken: {type:"password"},
+            topicPassword: {type:"password"},
+            personalPassword: {type:"password"}
         },
         inputs:1,
         outputs:1,
@@ -30,6 +40,21 @@
             return this.name||"simplepush";
         },
         oneditprepare: function() {
+            // Flows saved by version 1.x carry the old key, event and
+            // password; show them in their new fields.
+            if ($("#node-input-topic").val() === "" && this.key) {
+                $("#node-input-topic").val(this.key);
+            }
+            if ($("#node-input-tag").val() === "" && this.event) {
+                $("#node-input-tag").val(this.event);
+            }
+            if (!(this.credentials && this.credentials.has_topicPassword) && this.password) {
+                $("#node-input-topicPassword").val(this.password);
+            }
+            if (this.autoCommit === undefined) {
+                $("#node-input-autoCommit").prop("checked", true);
+            }
+
             if ($("#node-input-actions").val() !== "") {
                 $("#node-input-actionTimeout").prop("disabled", false);
             } else {
@@ -46,6 +71,10 @@
         },
         oneditsave: function() {
             var node = this;
+            node.key = "";
+            node.event = "";
+            node.password = "";
+            node.salt = "";
             var actions = $("#node-input-actions").val();
             if (actions !== "") {
                 actions = actions.split(/[ ,]+/).filter(Boolean);
@@ -59,8 +88,12 @@
 
 <script type="text/html" data-template-name="simplepush">
     <div class="form-row">
-        <label for="node-input-key"><i class="fa fa-tag"></i> Key</label>
-        <input type="text" id="node-input-key" placeholder="Key">
+        <label for="node-input-apiToken"><i class="fa fa-key"></i> API Token</label>
+        <input type="password" id="node-input-apiToken" placeholder="From the app: Settings > API Token">
+    </div>
+    <div class="form-row">
+        <label for="node-input-topic"><i class="fa fa-tag"></i> Topic</label>
+        <input type="text" id="node-input-topic" placeholder="Leave blank will use msg.topic, or send to your own devices">
     </div>
     <div class="form-row">
         <label for="node-input-title"><i class="fa fa-align-left"></i> Title</label>
@@ -71,15 +104,15 @@
         <input type="text" id="node-input-message" placeholder="Leave blank will use msg.payload">
     </div>
     <div class="form-row">
-        <label for="node-input-attachments"><i class="fa fa-align-left"></i> Attachments</label>
-        <input type="text" id="node-input-attachments" placeholder="Leave blank will use msg.attachments">
+        <label for="node-input-attachments"><i class="fa fa-paperclip"></i> Attachments</label>
+        <input type="text" id="node-input-attachments" placeholder="URLs separated by comma; Leave blank will use msg.attachments">
     </div>
     <div class="form-row">
-        <label for="node-input-event"><i class="fa fa-align-left"></i> Event</label>
-        <input type="text" id="node-input-event" placeholder="Leave blank will use msg.event">
+        <label for="node-input-tag"><i class="fa fa-bookmark"></i> Tag</label>
+        <input type="text" id="node-input-tag" placeholder="Leave blank will use msg.tag">
     </div>
     <div class="form-row">
-        <label for="node-input-actions"><i class="fa fa-align-left"></i> Feedback Actions</label>
+        <label for="node-input-actions"><i class="fa fa-align-left"></i> Actions</label>
         <input type="text" id="node-input-actions" placeholder="Actions separated by comma; Leave blank will use msg.actions">
     </div>
     <div class="form-row">
@@ -87,12 +120,16 @@
         <input type="text" id="node-input-actionTimeout" style="margin-left: 0px; vertical-align: center; width: 50px !important;"> <label style="width:auto !important;" for="node-input-actionTimeout">Timeout in seconds</label>
     </div>
     <div class="form-row">
-        <label for="node-input-password"><i class="fa fa-align-left"></i> Password</label>
-        <input type="password" id="node-input-password" placeholder="Leave blank will use msg.password and only for encrypted notifications">
+        <label for="node-input-autoCommit"><i class="fa fa-check"></i> Auto commit</label>
+        <input type="checkbox" id="node-input-autoCommit" style="display:inline-block; width:auto; vertical-align:top;"> <label for="node-input-autoCommit" style="width:auto !important;">Complete the task as soon as an action is tapped</label>
     </div>
     <div class="form-row">
-        <label for="node-input-salt"><i class="fa fa-align-left"></i> Salt</label>
-        <input type="password" id="node-input-salt" placeholder="Leave blank will use msg.salt and only for encrypted notifications">
+        <label for="node-input-topicPassword"><i class="fa fa-lock"></i> Topic Password</label>
+        <input type="password" id="node-input-topicPassword" placeholder="Password of the topic; Leave blank will use msg.password">
+    </div>
+    <div class="form-row">
+        <label for="node-input-personalPassword"><i class="fa fa-lock"></i> Personal Password</label>
+        <input type="password" id="node-input-personalPassword" placeholder="For encrypted sends to your own devices">
     </div>
     <br/>
     <div class="form-row">
@@ -102,5 +139,48 @@
 </script>
 
 <script type="text/html" data-help-name="simplepush">
-    <p>Uses Simplepush to push actionable and encryptable notifications to Android and iOS devices.</p>
+    <p>Sends a <a href="https://simplepu.sh" target="_blank">Simplepush</a> task to Android and iOS devices, optionally encrypted and with action buttons whose answer is forwarded to the node's outputs.</p>
+
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">string | object</span></dt>
+        <dd>The message of the task. Objects are sent as JSON.</dd>
+        <dt class="optional">topic <span class="property-type">string</span></dt>
+        <dd>The topic to send to. Without a topic the task goes to your own devices.</dd>
+        <dt class="optional">title <span class="property-type">string</span></dt>
+        <dd>The title of the task.</dd>
+        <dt class="optional">attachments <span class="property-type">array</span></dt>
+        <dd>URLs of files (images, videos, documents) that are downloaded and attached to the task. At most 10.</dd>
+        <dt class="optional">tag <span class="property-type">string</span></dt>
+        <dd>A label the app can group or filter on.</dd>
+        <dt class="optional">actions <span class="property-type">array</span></dt>
+        <dd>Action buttons shown on the task. The tapped action completes the task and is forwarded to the output.</dd>
+        <dt class="optional">timeout <span class="property-type">number</span></dt>
+        <dd>Seconds to wait for an action before raising a timeout error. The task expires on the device at the same time. 0 (the default) waits forever.</dd>
+        <dt class="optional">autoCommit <span class="property-type">boolean</span></dt>
+        <dd>Overrides the Auto commit setting. <code>true</code> completes the task as soon as an action is tapped, <code>false</code> shows a Submit button.</dd>
+        <dt class="optional">password <span class="property-type">string</span></dt>
+        <dd>The topic's password (set in the app) for an encrypted task to a topic.</dd>
+        <dt class="optional">personalPassword <span class="property-type">string</span></dt>
+        <dd>Your Personal Password (set in the app) for an encrypted task to your own devices.</dd>
+        <dt class="optional">apiToken <span class="property-type">string</span></dt>
+        <dd>Overrides the API token from the node config.</dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <p>Only when actions are set. With actions in the node config there is one output per action and the message leaves through the output of the tapped action. With <code>msg.actions</code> there is one output.</p>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">string</span></dt>
+        <dd>The tapped action.</dd>
+        <dt>taskId <span class="property-type">string</span></dt>
+        <dd>Id of the task that was answered.</dd>
+        <dt>actionSelectedAt <span class="property-type">string</span></dt>
+        <dd>When the action was tapped (ISO 8601).</dd>
+        <dt>recipient <span class="property-type">object</span></dt>
+        <dd>Who answered (<code>publicId</code>, <code>name</code>).</dd>
+    </dl>
+
+    <h3>Details</h3>
+    <p>Values set in the node config take precedence over the message properties, except <code>msg.autoCommit</code>, which overrides the checkbox.</p>
+    <p>Create the API token in the Simplepush app under Settings &gt; API Token. Topics, topic passwords and the Personal Password are managed in the app as well. A task to a topic is encrypted with the topic password, a task to your own devices with the Personal Password.</p>
 </script>
