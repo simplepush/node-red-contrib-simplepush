@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-simplepush",
-  "version": "1.4.1",
+  "version": "2.0.0",
   "description": "Simplepush wrapper for Node-RED",
   "dependencies": {
     "@simplepush/sdk": "^0.7.0"
