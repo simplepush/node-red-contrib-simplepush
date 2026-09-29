@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "description": "Simplepush tasks, notifications and submissions for Node-RED",
   "dependencies": {
-    "@simplepush/sdk": "^0.10.0"
+    "@simplepush/sdk": "^0.11.1"
   },
   "repository": {
     "type": "git",

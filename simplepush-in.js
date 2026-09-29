@@ -4,6 +4,16 @@ module.exports = function(RED) {
     // Wait before listening again after a failure that may go away.
     var RETRY_MS = 30000;
 
+    // Failures that won't go away by themselves: a missing token, a request
+    // refused with a 4xx, or the event connection refused with one ("Unexpected
+    // server response: 401"). 408, 425 and 429 are worth another try.
+    function permanent(err) {
+        if (!err) { return false; }
+        if (err.name === 'SimplepushConfigError') { return true; }
+        var status = err.name === 'HttpError' ? err.status : Number((/Unexpected server response:\s*(\d{3})/.exec(err.message || '') || [])[1]);
+        return status >= 400 && status < 500 && [408, 425, 429].indexOf(status) === -1;
+    }
+
     // Sends a message for every submission: what people send from the app on
     // their own, without a task.
     function SimplepushInNode(config) {
@@ -12,9 +22,6 @@ module.exports = function(RED) {
         var account = RED.nodes.getNode(config.account);
         var ac = new AbortController();
         var retryTimer;
-        // Where to pick up after a restart, so nothing sent meanwhile is lost.
-        var since;
-        var lastId;
 
         if (!account) {
             node.status({ fill: "red", shape: "ring", text: "no account" });
@@ -36,12 +43,9 @@ module.exports = function(RED) {
         async function listen() {
             var client = await account.client();
             node.status({ fill: "green", shape: "dot", text: "listening" });
-            var options = { signal: ac.signal };
-            if (since) { options.since = since; }
-            for await (const submission of client.submissions(options)) {
-                if (submission.id !== undefined && submission.id === lastId) { continue; }
-                lastId = submission.id;
-                if (submission.createdAt) { since = submission.createdAt; }
+            // Shares the account's connection with the task and notification
+            // nodes, which also resumes after a dropped connection.
+            for await (const submission of client.submissions({ signal: ac.signal })) {
                 try {
                     await received(submission);
                 } catch (err) {
@@ -55,9 +59,7 @@ module.exports = function(RED) {
                 // The stream only ends when the node closes.
             }, function(err) {
                 if (ac.signal.aborted) { return; }
-                // A missing or rejected token or a missing permission won't go
-                // away by itself; anything else is tried again.
-                if (err && (err.name === 'SimplepushConfigError' || (err.name === 'HttpError' && err.status >= 400 && err.status < 500))) {
+                if (permanent(err)) {
                     node.status({ fill: "red", shape: "ring", text: "stopped" });
                     node.error('Simplepush: stopped listening for submissions: ' + err.message);
                     return;
