@@ -1,0 +1,199 @@
+<script type="text/javascript">
+    (function() {
+        function isOrganization(accountId) {
+            var account = RED.nodes.node(accountId);
+            return Boolean(account && account.account === "organization");
+        }
+
+        RED.nodes.registerType('simplepush-notification', {
+            category: 'network',
+            color: '#ffaaaa',
+            paletteLabel: 'simplepush notification',
+            defaults: {
+                name: {value: ""},
+                account: {value: "", type: "simplepush-account", required: true},
+                topic: {value: ""},
+                member: {value: ""},
+                broadcast: {value: false},
+                title: {value: ""},
+                message: {value: ""},
+                tag: {value: ""},
+                priority: {value: ""},
+                shared: {value: false},
+                inputType: {value: ""},
+                inputOptions: {value: ""},
+                timeout: {value: ""},
+                link: {value: ""},
+                image: {value: ""},
+                audio: {value: ""}
+            },
+            inputs: 1,
+            outputs: 2,
+            outputLabels: ["completed", "no answer before the timeout"],
+            icon: "simplepush.svg",
+            label: function() {
+                return this.name || this.title || "simplepush notification";
+            },
+            oneditprepare: function() {
+                // An organization send goes to exactly one of topic, member or
+                // broadcast, so broadcast turns the other two off.
+                var showTarget = function() {
+                    var broadcast = isOrganization($("#node-input-account").val()) && $("#node-input-broadcast").prop("checked");
+                    $("#node-input-topic, #node-input-member").prop("disabled", broadcast);
+                };
+                var showAccount = function() {
+                    $(".simplepush-organization").toggle(isOrganization($("#node-input-account").val()));
+                    showTarget();
+                };
+                showAccount();
+                $("#node-input-account").on("change", showAccount);
+                $("#node-input-broadcast").on("change", showTarget);
+
+                var showInput = function() {
+                    var type = $("#node-input-inputType").val();
+                    $(".simplepush-input-options").toggle(type === "choice" || type === "actions");
+                    $(".simplepush-input-wait").toggle(type !== "");
+                    $(".simplepush-link").toggle(type === "");
+                    $("#node-input-inputOptions").attr("placeholder", type === "choice"
+                        ? "Up to 3 options, comma separated"
+                        : "Up to 3 actions, comma separated");
+                };
+                showInput();
+                $("#node-input-inputType").on("change", showInput);
+            },
+            oneditsave: function() {
+                if (!isOrganization($("#node-input-account").val())) {
+                    $("#node-input-member").val("");
+                    $("#node-input-broadcast").prop("checked", false);
+                } else if ($("#node-input-broadcast").prop("checked")) {
+                    $("#node-input-topic").val("");
+                    $("#node-input-member").val("");
+                }
+                var type = $("#node-input-inputType").val();
+                if (type === "" || type === "text") { $("#node-input-inputOptions").val(""); }
+                if (type === "") { $("#node-input-timeout").val(""); } else { $("#node-input-link").val(""); }
+            }
+        });
+    })();
+</script>
+
+<script type="text/html" data-template-name="simplepush-notification">
+    <div class="form-row">
+        <label for="node-input-account"><i class="fa fa-user"></i> Account</label>
+        <input type="text" id="node-input-account">
+    </div>
+    <div class="form-row">
+        <label for="node-input-topic"><i class="fa fa-hashtag"></i> Topic</label>
+        <input type="text" id="node-input-topic" placeholder="Blank uses msg.topic, or sends to your own devices">
+    </div>
+    <div class="form-row simplepush-organization">
+        <label for="node-input-member"><i class="fa fa-user-o"></i> Member</label>
+        <input type="text" id="node-input-member" placeholder="Organization member name; blank uses msg.member">
+    </div>
+    <div class="form-row simplepush-organization">
+        <label for="node-input-broadcast"><i class="fa fa-bullhorn"></i> Broadcast</label>
+        <input type="checkbox" id="node-input-broadcast" style="display:inline-block; width:auto; vertical-align:top;"> <label for="node-input-broadcast" style="width:auto !important;">Send to every member of the organization</label>
+    </div>
+    <div class="form-row">
+        <label for="node-input-title"><i class="fa fa-header"></i> Title</label>
+        <input type="text" id="node-input-title" placeholder="Blank uses msg.title">
+    </div>
+    <div class="form-row">
+        <label for="node-input-message"><i class="fa fa-align-left"></i> Message</label>
+        <input type="text" id="node-input-message" placeholder="Blank uses msg.payload">
+    </div>
+    <div class="form-row">
+        <label for="node-input-inputType"><i class="fa fa-reply"></i> Answer</label>
+        <select id="node-input-inputType" style="width:70%">
+            <option value="">None, or msg.input</option>
+            <option value="actions">Action buttons</option>
+            <option value="choice">Choice</option>
+            <option value="text">Text</option>
+        </select>
+    </div>
+    <div class="form-row simplepush-input-options">
+        <label for="node-input-inputOptions">&nbsp;</label>
+        <input type="text" id="node-input-inputOptions" style="width:70%">
+    </div>
+    <div class="form-row simplepush-input-wait">
+        <label for="node-input-timeout"><i class="fa fa-clock-o"></i> Timeout</label>
+        <input type="text" id="node-input-timeout" placeholder="Seconds to wait for answers; blank waits until redeploy" style="width:70%">
+    </div>
+    <div class="form-row simplepush-link">
+        <label for="node-input-link"><i class="fa fa-link"></i> Link</label>
+        <input type="text" id="node-input-link" placeholder="URL or app link opened from the push; blank uses msg.link">
+    </div>
+    <div class="form-row">
+        <label for="node-input-image"><i class="fa fa-picture-o"></i> Image</label>
+        <input type="text" id="node-input-image" placeholder="Image URL; blank uses msg.image">
+    </div>
+    <div class="form-row">
+        <label for="node-input-audio"><i class="fa fa-music"></i> Audio</label>
+        <input type="text" id="node-input-audio" placeholder="Audio URL, plays on iOS; blank uses msg.audio">
+    </div>
+    <div class="form-row">
+        <label for="node-input-priority"><i class="fa fa-volume-up"></i> Priority</label>
+        <select id="node-input-priority" style="width:70%">
+            <option value="">Default (3), or msg.priority</option>
+            <option value="1">1: silent</option>
+            <option value="2">2: quiet, status bar icon</option>
+            <option value="3">3: banner with sound</option>
+            <option value="4">4: gets through Focus and Do Not Disturb</option>
+            <option value="5">5: critical, sounds on a muted phone</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-shared"><i class="fa fa-users"></i> Shared</label>
+        <input type="checkbox" id="node-input-shared" style="display:inline-block; width:auto; vertical-align:top;"> <label for="node-input-shared" style="width:auto !important;">One notification for all recipients, the first answer completes it</label>
+    </div>
+    <div class="form-row">
+        <label for="node-input-tag"><i class="fa fa-tag"></i> Tag</label>
+        <input type="text" id="node-input-tag" placeholder="Blank uses msg.tag">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-pencil"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="simplepush-notification">
+    <p>Sends a <a href="https://simplepu.sh" target="_blank">Simplepush</a> notification: a push that does not stay in the app's task list. It can carry one answer (action buttons, a choice or a text reply), an image or audio clip, or a link.</p>
+
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">string | object</span></dt>
+        <dd>The message. Objects are sent as JSON.</dd>
+        <dt class="optional">topic, member, broadcast, title, tag, priority, shared</dt>
+        <dd>As on the task node.</dd>
+        <dt class="optional">input <span class="property-type">object</span></dt>
+        <dd>The answer, when the node has none: <code>{type: "text"}</code>, <code>{type: "choice", options: [...]}</code> or <code>{type: "actions", actions: [...]}</code>, at most 3 options or actions.</dd>
+        <dt class="optional">timeout <span class="property-type">number</span></dt>
+        <dd>Seconds to wait for answers.</dd>
+        <dt class="optional">link <span class="property-type">string</span></dt>
+        <dd>A URL shown as an Open link button. Any scheme works, so an app link opens that app. Not together with an answer.</dd>
+        <dt class="optional">image, audio <span class="property-type">string | object</span></dt>
+        <dd>A URL, or <code>{filename, data, contentType}</code> with <code>data</code> a Buffer, which is uploaded. Audio plays on iOS only. One of the two.</dd>
+    </dl>
+    <p>Values set in the node take precedence over message properties, except checkboxes, where a boolean on the message wins.</p>
+
+    <h3>Outputs</h3>
+    <p>With an answer the node sends one message per recipient who answers. A notification does not expire: without a timeout the node waits until everyone answered or the flow is redeployed.</p>
+    <ol class="node-ports">
+        <li>Completed
+            <dl class="message-properties">
+                <dt>payload <span class="property-type">object</span></dt>
+                <dd><code>action</code>, <code>choice</code> or <code>text</code>.</dd>
+                <dt>status <span class="property-type">string</span></dt>
+                <dd><code>completed</code></dd>
+                <dt>notificationId, groupId, recipient, completedAt</dt>
+                <dd>As on the task node.</dd>
+            </dl>
+        </li>
+        <li>No answer before the timeout, one message per recipient
+            <dl class="message-properties">
+                <dt>status <span class="property-type">string</span></dt>
+                <dd><code>pending</code></dd>
+            </dl>
+        </li>
+    </ol>
+</script>

@@ -22,7 +22,8 @@
     "version": ">=3.0.0",
     "nodes": {
       "simplepush-account": "simplepush-account.js",
-      "simplepush": "simplepush.js"
+      "simplepush": "simplepush.js",
+      "simplepush-notification": "simplepush-notification.js"
     }
   },
   "engines": {
