@@ -1,6 +1,13 @@
 module.exports = function(RED) {
     var shared = require('./lib/shared');
 
+    // A setting missing from the account; trying again won't help.
+    function configError(message) {
+        var err = new Error(message);
+        err.name = 'SimplepushConfigError';
+        return err;
+    }
+
     // One Simplepush account shared by every node that selects it: one client,
     // one event connection. A personal account signs in with an API token and
     // holds the topic passwords and the Personal Password; an organization
@@ -28,12 +35,12 @@ module.exports = function(RED) {
                 clientPromise = shared.loadSdk().then(function(sdk) {
                     if (node.organization) {
                         if (!credentials.integrationToken) {
-                            throw new Error('Simplepush error: enter an integration token in the Simplepush account (sp integration create)');
+                            throw configError('Simplepush error: enter an integration token in the Simplepush account (sp integration create)');
                         }
                         return sdk.OrgClient.fromIntegrationToken(credentials.integrationToken);
                     }
                     if (!credentials.apiToken) {
-                        throw new Error('Simplepush error: enter an API token in the Simplepush account (app: Settings > API Token)');
+                        throw configError('Simplepush error: enter an API token in the Simplepush account (app: Settings > API Token)');
                     }
                     var passwords = topics.map(function(t) { return [t.password, t.topic]; });
                     if (node.personalPassword) { passwords.push(node.personalPassword); }

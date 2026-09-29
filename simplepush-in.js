@@ -55,9 +55,9 @@ module.exports = function(RED) {
                 // The stream only ends when the node closes.
             }, function(err) {
                 if (ac.signal.aborted) { return; }
-                // A rejected token or a missing permission won't go away by
-                // itself; anything else is tried again.
-                if (err && err.name === 'HttpError' && err.status >= 400 && err.status < 500) {
+                // A missing or rejected token or a missing permission won't go
+                // away by itself; anything else is tried again.
+                if (err && (err.name === 'SimplepushConfigError' || (err.name === 'HttpError' && err.status >= 400 && err.status < 500))) {
                     node.status({ fill: "red", shape: "ring", text: "stopped" });
                     node.error('Simplepush: stopped listening for submissions: ' + err.message);
                     return;
