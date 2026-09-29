@@ -1,113 +1,255 @@
 <script type="text/javascript">
-    RED.nodes.registerType('simplepush',{
-        category: 'function',
-        color: '#ffaaaa',
-        defaults: {
-            account: {value:"", type:"simplepush-account", required:true},
-            topic: {value:""},
-            member: {value:""},
-            broadcast: {value:false},
-            title: {value:""},
-            message: {value:""},
-            attachments: {value:""},
-            tag: {value:""},
-            actions: {value:""},
-            actionTimeout: {value:0},
-            autoCommit: {value:true},
-            name: {value:""},
-            outputs: {value:1},
-            // Properties of flows saved by version 1.x. Kept so a deploy does
-            // not drop them; the edit dialog moves them into the new fields.
-            key: {value:""},
-            event: {value:""},
-            password: {value:""},
-            salt: {value:""}
-        },
-        inputs:1,
-        outputs:1,
-        outputLabels: function(index) {
-            if (this.actions !== "") {
-                actions = this.actions.split(/[ ,]+/).filter(Boolean);
-                return actions[index];
-            } else {
-                return "actionOutput";
-            }
-        },
-        icon: "simplepush.svg",
-        label: function() {
-            return this.name||"simplepush";
-        },
-        oneditprepare: function() {
-            // Member and broadcast only exist for an organization account. An
-            // organization send goes to exactly one of topic, member or
-            // broadcast, so broadcast turns the other two off.
-            var isOrganization = function() {
-                var account = RED.nodes.node($("#node-input-account").val());
-                return Boolean(account && account.account === "organization");
-            };
-            var showTarget = function() {
-                var broadcast = isOrganization() && $("#node-input-broadcast").prop("checked");
-                $("#node-input-topic, #node-input-member").prop("disabled", broadcast);
-            };
-            var showAccount = function() {
-                $(".simplepush-organization").toggle(isOrganization());
-                showTarget();
-            };
-            showAccount();
-            $("#node-input-account").on("change", showAccount);
-            $("#node-input-broadcast").on("change", showTarget);
+    (function() {
+        // Fields each input type shows in the inputs list.
+        var INPUT_FIELDS = {
+            actions: ["actions"],
+            text: ["defaultValue"],
+            choice: ["options", "multi"],
+            slider: ["min", "max", "step", "unit", "defaultValue"],
+            photo: [],
+            voiceRecording: [],
+            file: [],
+            location: []
+        };
+        // Outputs for tasks that ended without an answer, after the answer
+        // outputs. Same order as the runtime.
+        var TERMINAL_OUTPUTS = ["declined", "canceled", "expired"];
 
-            // Flows saved by version 1.x carry the old key, event and
-            // password; show them in their new fields.
-            if ($("#node-input-topic").val() === "" && this.key) {
-                $("#node-input-topic").val(this.key);
-            }
-            if ($("#node-input-tag").val() === "" && this.event) {
-                $("#node-input-tag").val(this.event);
-            }
-            if (this.password) {
-                $("#simplepush-legacy-password").show();
-            }
-            if (this.autoCommit === undefined) {
-                $("#node-input-autoCommit").prop("checked", true);
-            }
+        var INPUT_LABELS = {
+            actions: "Actions",
+            text: "Text",
+            choice: "Choice",
+            slider: "Slider",
+            photo: "Photo",
+            voiceRecording: "Voice recording",
+            file: "File",
+            location: "Location"
+        };
 
-            if ($("#node-input-actions").val() !== "") {
-                $("#node-input-actionTimeout").prop("disabled", false);
-            } else {
-                $("#node-input-actionTimeout").prop("disabled", true);
-            }
-
-            $("#node-input-actions").on('input', function() {
-                if ($("#node-input-actions").val() !== "") {
-                    $("#node-input-actionTimeout").prop("disabled", false);
-                } else {
-                    $("#node-input-actionTimeout").prop("disabled", true);
-                }
-            });
-        },
-        oneditsave: function() {
-            var node = this;
-            node.key = "";
-            node.event = "";
-            var account = RED.nodes.node($("#node-input-account").val());
-            if (!(account && account.account === "organization")) {
-                $("#node-input-member").val("");
-                $("#node-input-broadcast").prop("checked", false);
-            } else if ($("#node-input-broadcast").prop("checked")) {
-                $("#node-input-topic").val("");
-                $("#node-input-member").val("");
-            }
-            node.salt = "";
-            var actions = $("#node-input-actions").val();
-            if (actions !== "") {
-                actions = actions.split(/[ ,]+/).filter(Boolean);
-                node.outputs = actions.length > 10 ? 10 : actions.length;
-            } else {
-                node.outputs = 1;
-            }
+        function isOrganization(accountId) {
+            var account = RED.nodes.node(accountId);
+            return Boolean(account && account.account === "organization");
         }
-    });
+
+        function configActions(node) {
+            var actions = [];
+            (node.taskInputs || []).forEach(function(entry) {
+                if (entry.type === "actions") { actions = entry.actions || []; }
+            });
+            if (actions.length === 0 && (!node.taskInputs || node.taskInputs.length === 0) && node.actions) {
+                actions = node.actions.split(/[ ,]+/).filter(Boolean);
+            }
+            return actions;
+        }
+
+        function field(row, cls, placeholder, width) {
+            return $('<input type="text">').addClass(cls).attr("placeholder", placeholder).css({width: width || "100%"}).appendTo(row);
+        }
+
+        RED.nodes.registerType('simplepush', {
+            category: 'network',
+            color: '#ffaaaa',
+            paletteLabel: 'simplepush task',
+            defaults: {
+                name: {value: ""},
+                account: {value: "", type: "simplepush-account", required: true},
+                topic: {value: ""},
+                member: {value: ""},
+                broadcast: {value: false},
+                title: {value: ""},
+                message: {value: ""},
+                tag: {value: ""},
+                expiresIn: {value: ""},
+                attachments: {value: ""},
+                taskInputs: {value: []},
+                autoCommit: {value: true},
+                outputs: {value: 4},
+                // Properties of flows saved by version 1.x. Kept so a deploy
+                // does not drop them; the edit dialog moves them into the new
+                // fields.
+                key: {value: ""},
+                event: {value: ""},
+                password: {value: ""},
+                salt: {value: ""},
+                actions: {value: ""},
+                actionTimeout: {value: ""}
+            },
+            inputs: 1,
+            outputs: 4,
+            outputLabels: function(index) {
+                var actions = configActions(this);
+                var answers = Math.max(actions.length, 1);
+                if (index >= answers) { return TERMINAL_OUTPUTS[index - answers]; }
+                return actions.length > 0 ? actions[index] : "completed";
+            },
+            icon: "simplepush.svg",
+            label: function() {
+                return this.name || this.title || "simplepush task";
+            },
+            oneditprepare: function() {
+                var node = this;
+
+                // Flows saved by version 1.x carry the old key, event, actions
+                // and timeout; show them in their new fields.
+                if ($("#node-input-topic").val() === "" && node.key) { $("#node-input-topic").val(node.key); }
+                if ($("#node-input-tag").val() === "" && node.event) { $("#node-input-tag").val(node.event); }
+                if ($("#node-input-expiresIn").val() === "" && Number(node.actionTimeout) > 0) {
+                    $("#node-input-expiresIn").val(node.actionTimeout);
+                }
+                if (node.autoCommit === undefined) { $("#node-input-autoCommit").prop("checked", true); }
+                var inputs = (node.taskInputs || []).slice();
+                if (inputs.length === 0 && node.actions) {
+                    inputs.push({type: "actions", actions: node.actions.split(/[ ,]+/).filter(Boolean), required: true});
+                }
+                if (node.password) {
+                    $("#simplepush-legacy-password").show();
+                }
+
+                // An organization send goes to exactly one of topic, member or
+                // broadcast, so broadcast turns the other two off.
+                var showTarget = function() {
+                    var broadcast = isOrganization($("#node-input-account").val()) && $("#node-input-broadcast").prop("checked");
+                    $("#node-input-topic, #node-input-member").prop("disabled", broadcast);
+                };
+                var showAccount = function() {
+                    $(".simplepush-organization").toggle(isOrganization($("#node-input-account").val()));
+                    showTarget();
+                };
+                showAccount();
+                $("#node-input-account").on("change", showAccount);
+                $("#node-input-broadcast").on("change", showTarget);
+
+                $("#simplepush-inputs-list").editableList({
+                    addButton: "input",
+                    height: "auto",
+                    removable: true,
+                    sortable: true,
+                    addItem: function(row, index, data) {
+                        data = $.extend({type: "text", required: true}, data);
+                        var top = $('<div style="display:flex; gap:6px; align-items:center;">').appendTo(row);
+                        var type = $('<select class="simplepush-type" style="width:150px">').appendTo(top);
+                        Object.keys(INPUT_LABELS).forEach(function(t) {
+                            $('<option>').val(t).text(INPUT_LABELS[t]).appendTo(type);
+                        });
+                        field(top, "simplepush-description", "Description (optional)", "auto").css("flex", "1");
+                        $('<label style="width:auto; margin:0; white-space:nowrap;">').append(
+                            $('<input type="checkbox" class="simplepush-required" style="width:auto; margin:0 4px 0 0;">')
+                        ).append("Required").appendTo(top);
+
+                        var details = $('<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:6px;">').appendTo(row);
+                        var fields = {
+                            actions: field(details, "simplepush-actions", "Actions, comma separated: Yes, No"),
+                            options: field(details, "simplepush-options", "Options, comma separated: Red, Green, Blue"),
+                            min: field(details, "simplepush-min", "Min", "70px"),
+                            max: field(details, "simplepush-max", "Max", "70px"),
+                            step: field(details, "simplepush-step", "Step", "70px"),
+                            unit: field(details, "simplepush-unit", "Unit", "70px"),
+                            defaultValue: field(details, "simplepush-default", "Default value", "120px")
+                        };
+                        var multiRow = $('<span style="display:flex; gap:6px; align-items:center;">').appendTo(details);
+                        $('<label style="width:auto; margin:0; white-space:nowrap;">').append(
+                            $('<input type="checkbox" class="simplepush-multi" style="width:auto; margin:0 4px 0 0;">')
+                        ).append("Several").appendTo(multiRow);
+                        var minSel = field(multiRow, "simplepush-min-selections", "Min picks", "80px");
+                        var maxSel = field(multiRow, "simplepush-max-selections", "Max picks", "80px");
+                        fields.multi = multiRow;
+
+                        var showFields = function() {
+                            var t = type.val();
+                            Object.keys(fields).forEach(function(f) {
+                                fields[f].toggle(INPUT_FIELDS[t].indexOf(f) !== -1);
+                            });
+                            fields.defaultValue.attr("placeholder", t === "slider" ? "Start" : "Default value");
+                            fields.defaultValue.css("width", t === "slider" ? "70px" : "100%");
+                            var multi = row.find(".simplepush-multi").prop("checked");
+                            minSel.toggle(multi);
+                            maxSel.toggle(multi);
+                        };
+
+                        type.val(data.type);
+                        row.find(".simplepush-description").val(data.description || "");
+                        row.find(".simplepush-required").prop("checked", data.required !== false);
+                        fields.actions.val((data.actions || []).map(function(a) { return typeof a === "string" ? a : a.label; }).join(", "));
+                        fields.options.val((data.options || []).join(", "));
+                        fields.defaultValue.val(data.defaultValue === undefined ? "" : data.defaultValue);
+                        fields.min.val(data.min === undefined ? "" : data.min);
+                        fields.max.val(data.max === undefined ? "" : data.max);
+                        fields.step.val(data.step === undefined ? "" : data.step);
+                        fields.unit.val(data.unit || "");
+                        row.find(".simplepush-multi").prop("checked", Boolean(data.multi));
+                        minSel.val(data.minSelections === undefined ? "" : data.minSelections);
+                        maxSel.val(data.maxSelections === undefined ? "" : data.maxSelections);
+
+                        type.on("change", showFields);
+                        row.find(".simplepush-multi").on("change", showFields);
+                        showFields();
+                    }
+                });
+                inputs.forEach(function(entry) {
+                    $("#simplepush-inputs-list").editableList("addItem", entry);
+                });
+            },
+            oneditsave: function() {
+                var node = this;
+                var labels = function(value) {
+                    return value.split(",").map(function(s) { return s.trim(); }).filter(Boolean);
+                };
+                var number = function(value) {
+                    return value.trim() === "" ? undefined : Number(value);
+                };
+                var inputs = [];
+                $("#simplepush-inputs-list").editableList("items").each(function() {
+                    var row = $(this);
+                    var entry = {
+                        type: row.find(".simplepush-type").val(),
+                        required: row.find(".simplepush-required").prop("checked")
+                    };
+                    var description = row.find(".simplepush-description").val().trim();
+                    if (description) { entry.description = description; }
+                    var defaultValue = row.find(".simplepush-default").val();
+                    switch (entry.type) {
+                        case "actions":
+                            entry.actions = labels(row.find(".simplepush-actions").val());
+                            break;
+                        case "text":
+                            if (defaultValue) { entry.defaultValue = defaultValue; }
+                            break;
+                        case "choice":
+                            entry.options = labels(row.find(".simplepush-options").val());
+                            if (row.find(".simplepush-multi").prop("checked")) {
+                                entry.multi = true;
+                                entry.minSelections = number(row.find(".simplepush-min-selections").val());
+                                entry.maxSelections = number(row.find(".simplepush-max-selections").val());
+                            }
+                            break;
+                        case "slider":
+                            entry.min = number(row.find(".simplepush-min").val());
+                            entry.max = number(row.find(".simplepush-max").val());
+                            entry.step = number(row.find(".simplepush-step").val());
+                            entry.unit = row.find(".simplepush-unit").val().trim() || undefined;
+                            entry.defaultValue = number(defaultValue);
+                            break;
+                    }
+                    inputs.push(JSON.parse(JSON.stringify(entry)));
+                });
+                node.taskInputs = inputs;
+
+                if (!isOrganization($("#node-input-account").val())) {
+                    $("#node-input-member").val("");
+                    $("#node-input-broadcast").prop("checked", false);
+                } else if ($("#node-input-broadcast").prop("checked")) {
+                    $("#node-input-topic").val("");
+                    $("#node-input-member").val("");
+                }
+                node.key = "";
+                node.event = "";
+                node.salt = "";
+                node.actions = "";
+                node.actionTimeout = "";
+                node.outputs = Math.max(configActions(node).length, 1) + TERMINAL_OUTPUTS.length;
+            }
+        });
+    })();
 </script>
 
 <script type="text/html" data-template-name="simplepush">
@@ -116,48 +258,47 @@
         <input type="text" id="node-input-account">
     </div>
     <div class="form-row">
-        <label for="node-input-topic"><i class="fa fa-tag"></i> Topic</label>
-        <input type="text" id="node-input-topic" placeholder="Leave blank will use msg.topic, or send to your own devices">
+        <label for="node-input-topic"><i class="fa fa-hashtag"></i> Topic</label>
+        <input type="text" id="node-input-topic" placeholder="Blank uses msg.topic, or sends to your own devices">
     </div>
     <div class="form-row simplepush-organization">
         <label for="node-input-member"><i class="fa fa-user-o"></i> Member</label>
-        <input type="text" id="node-input-member" placeholder="Organization member name; Leave blank will use msg.member">
+        <input type="text" id="node-input-member" placeholder="Organization member name; blank uses msg.member">
     </div>
     <div class="form-row simplepush-organization">
         <label for="node-input-broadcast"><i class="fa fa-bullhorn"></i> Broadcast</label>
         <input type="checkbox" id="node-input-broadcast" style="display:inline-block; width:auto; vertical-align:top;"> <label for="node-input-broadcast" style="width:auto !important;">Send to every member of the organization</label>
     </div>
     <div class="form-row">
-        <label for="node-input-title"><i class="fa fa-align-left"></i> Title</label>
-        <input type="text" id="node-input-title" placeholder="Leave blank will use msg.title">
+        <label for="node-input-title"><i class="fa fa-header"></i> Title</label>
+        <input type="text" id="node-input-title" placeholder="Blank uses msg.title">
     </div>
     <div class="form-row">
         <label for="node-input-message"><i class="fa fa-align-left"></i> Message</label>
-        <input type="text" id="node-input-message" placeholder="Leave blank will use msg.payload">
+        <input type="text" id="node-input-message" placeholder="Blank uses msg.payload">
     </div>
-    <div class="form-row">
-        <label for="node-input-attachments"><i class="fa fa-paperclip"></i> Attachments</label>
-        <input type="text" id="node-input-attachments" placeholder="URLs separated by comma; Leave blank will use msg.attachments">
-    </div>
-    <div class="form-row">
-        <label for="node-input-tag"><i class="fa fa-bookmark"></i> Tag</label>
-        <input type="text" id="node-input-tag" placeholder="Leave blank will use msg.tag">
-    </div>
-    <div class="form-row">
-        <label for="node-input-actions"><i class="fa fa-align-left"></i> Actions</label>
-        <input type="text" id="node-input-actions" placeholder="Actions separated by comma; Leave blank will use msg.actions">
-    </div>
-    <div class="form-row">
-        <label></label>
-        <input type="text" id="node-input-actionTimeout" style="margin-left: 0px; vertical-align: center; width: 50px !important;"> <label style="width:auto !important;" for="node-input-actionTimeout">Timeout in seconds</label>
+    <div class="form-row simplepush-inputs-container-row">
+        <label style="width:auto;"><i class="fa fa-list"></i> Inputs</label>
+        <ol id="simplepush-inputs-list"></ol>
     </div>
     <div class="form-row">
         <label for="node-input-autoCommit"><i class="fa fa-check"></i> Auto commit</label>
-        <input type="checkbox" id="node-input-autoCommit" style="display:inline-block; width:auto; vertical-align:top;"> <label for="node-input-autoCommit" style="width:auto !important;">Complete the task as soon as an action is tapped</label>
+        <input type="checkbox" id="node-input-autoCommit" style="display:inline-block; width:auto; vertical-align:top;"> <label for="node-input-autoCommit" style="width:auto !important;">Save each input as it is filled, no Submit button</label>
     </div>
-    <br/>
     <div class="form-row">
-        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <label for="node-input-expiresIn"><i class="fa fa-clock-o"></i> Expires in</label>
+        <input type="text" id="node-input-expiresIn" placeholder="Seconds until an unanswered task expires; blank uses msg.expiresIn" style="width:70%">
+    </div>
+    <div class="form-row">
+        <label for="node-input-tag"><i class="fa fa-tag"></i> Tag</label>
+        <input type="text" id="node-input-tag" placeholder="Blank uses msg.tag">
+    </div>
+    <div class="form-row">
+        <label for="node-input-attachments"><i class="fa fa-paperclip"></i> Attachments</label>
+        <input type="text" id="node-input-attachments" placeholder="Comma separated URLs of files; blank uses msg.attachments">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-pencil"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Name">
     </div>
     <div class="form-tips" id="simplepush-legacy-password" style="display:none">
@@ -166,46 +307,51 @@
 </script>
 
 <script type="text/html" data-help-name="simplepush">
-    <p>Sends a <a href="https://simplepu.sh" target="_blank">Simplepush</a> task to Android and iOS devices, optionally encrypted and with action buttons whose answer is forwarded to the node's outputs.</p>
+    <p>Sends a <a href="https://simplepu.sh" target="_blank">Simplepush</a> task to Android and iOS devices and forwards every answer. A task can ask for any number of inputs: action buttons, text, a choice, a slider, a photo, a voice recording, a file or a location.</p>
 
     <h3>Inputs</h3>
     <dl class="message-properties">
         <dt>payload <span class="property-type">string | object</span></dt>
         <dd>The message of the task. Objects are sent as JSON.</dd>
         <dt class="optional">topic <span class="property-type">string</span></dt>
-        <dd>The topic to send to. Without a topic a personal account sends to its own devices.</dd>
+        <dd>The topic the task is sent to. Without a topic a personal account sends to its own devices.</dd>
         <dt class="optional">member <span class="property-type">string</span></dt>
         <dd>Organization only. The member (by name) the task is sent to.</dd>
         <dt class="optional">broadcast <span class="property-type">boolean</span></dt>
         <dd>Organization only. <code>true</code> sends the task to every member. An organization send needs exactly one of topic, member or broadcast.</dd>
         <dt class="optional">title <span class="property-type">string</span></dt>
         <dd>The title of the task.</dd>
-        <dt class="optional">attachments <span class="property-type">array</span></dt>
-        <dd>URLs of files (images, videos, documents) that are downloaded and attached to the task. At most 10.</dd>
+        <dt class="optional">inputs <span class="property-type">array</span></dt>
+        <dd>The inputs of the task, when the node has none. Each entry has a <code>type</code> (<code>actions</code>, <code>text</code>, <code>choice</code>, <code>slider</code>, <code>photo</code>, <code>voiceRecording</code>, <code>file</code>, <code>location</code>), an optional <code>description</code> and <code>required</code> (default <code>true</code>). <code>actions</code> takes <code>actions</code> (labels, or <code>{key, label, style}</code>), <code>choice</code> takes <code>options</code> and optionally <code>multi</code>, <code>minSelections</code>, <code>maxSelections</code>, <code>text</code> takes <code>defaultValue</code>, <code>slider</code> takes <code>min</code>, <code>max</code>, <code>step</code>, <code>unit</code>, <code>defaultValue</code>. Each type at most once.</dd>
+        <dt class="optional">expiresIn <span class="property-type">number</span></dt>
+        <dd>Seconds until an unanswered task expires.</dd>
         <dt class="optional">tag <span class="property-type">string</span></dt>
-        <dd>A label the app can group or filter on.</dd>
-        <dt class="optional">actions <span class="property-type">array</span></dt>
-        <dd>Action buttons shown on the task. The tapped action completes the task and is forwarded to the output.</dd>
-        <dt class="optional">timeout <span class="property-type">number</span></dt>
-        <dd>Seconds to wait for an action before raising a timeout error. The task expires on the device at the same time. 0 (the default) waits forever.</dd>
+        <dd>A label the app can group or filter tasks by.</dd>
+        <dt class="optional">attachments <span class="property-type">array</span></dt>
+        <dd>URLs of files that are downloaded and attached to the task.</dd>
         <dt class="optional">autoCommit <span class="property-type">boolean</span></dt>
-        <dd>Overrides the Auto commit setting. <code>true</code> completes the task as soon as an action is tapped, <code>false</code> shows a Submit button.</dd>
+        <dd>Overrides the node's Auto commit.</dd>
     </dl>
+    <p>Values set in the node take precedence over message properties, except checkboxes, where a boolean on the message wins.</p>
 
     <h3>Outputs</h3>
-    <p>Only when actions are set. With actions in the node config there is one output per action and the message leaves through the output of the tapped action. With <code>msg.actions</code> there is one output.</p>
+    <p>A task with inputs sends one message per answer. Sent to a topic or an organization, every recipient gets their own task and answers on their own. With actions set in the node there is one output per action; otherwise answers leave through the first output. Then one output each for tasks that ended without an answer: declined, canceled (withdrawn by the sender) and expired. A task that everyone deleted from their list ends without a message.</p>
     <dl class="message-properties">
-        <dt>payload <span class="property-type">string</span></dt>
-        <dd>The tapped action.</dd>
+        <dt>payload <span class="property-type">object | string</span></dt>
+        <dd>The answer, one key per answered input: <code>action</code>, <code>text</code>, <code>choice</code>, <code>choices</code> (several picked), <code>slider</code>, <code>location</code> (<code>latitude</code>, <code>longitude</code>, <code>accuracy</code>, ...), and <code>photo</code>, <code>voice</code>, <code>file</code> as <code>{data, filename, contentType, size}</code> with <code>data</code> a Buffer. On the outputs for tasks without an answer: the status.</dd>
+        <dt>status <span class="property-type">string</span></dt>
+        <dd><code>completed</code>, or how the task ended: <code>declined</code>, <code>canceled</code>, <code>expired</code>.</dd>
         <dt>taskId <span class="property-type">string</span></dt>
-        <dd>Id of the task that was answered.</dd>
-        <dt>actionSelectedAt <span class="property-type">string</span></dt>
-        <dd>When the action was tapped (ISO 8601).</dd>
+        <dd>The task that was answered.</dd>
+        <dt>groupId <span class="property-type">string</span></dt>
+        <dd>The group of tasks, one per recipient.</dd>
         <dt>recipient <span class="property-type">object</span></dt>
-        <dd>Who answered (<code>publicId</code>, <code>name</code>). For an organization this is the member.</dd>
+        <dd>Who answered: <code>publicId</code>, <code>name</code>. For an organization this is the member.</dd>
+        <dt>completedAt <span class="property-type">string</span></dt>
+        <dd>When the task was completed.</dd>
+        <dt class="optional">declines <span class="property-type">array</span></dt>
+        <dd>On a declined task: who declined, as <code>{recipient, reason, note}</code>.</dd>
+        <dt class="optional">note <span class="property-type">string</span></dt>
+        <dd>The note left when declining, when one person declined.</dd>
     </dl>
-
-    <h3>Details</h3>
-    <p>Values set in the node config take precedence over the message properties, except <code>msg.autoCommit</code>, which overrides the checkbox.</p>
-    <p>The API token or organization integration token, the topic passwords and the Personal Password are set in the Simplepush account the node uses.</p>
 </script>
