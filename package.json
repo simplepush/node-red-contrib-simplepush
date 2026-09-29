@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "description": "Simplepush wrapper for Node-RED",
   "dependencies": {
-    "@simplepush/sdk": "^0.7.0"
+    "@simplepush/sdk": "^0.10.0"
   },
   "repository": {
     "type": "git",

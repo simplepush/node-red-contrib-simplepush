@@ -183,6 +183,8 @@ module.exports = function(RED) {
 
             var files = config.attachments ? shared.splitList(config.attachments) : msg.attachments;
             if (files !== undefined && !Array.isArray(files)) { throw new Error('Simplepush error: attachments must be an array'); }
+            var links = config.links ? shared.splitList(config.links) : msg.links;
+            if (links !== undefined && !Array.isArray(links)) { throw new Error('Simplepush error: links must be an array'); }
 
             // The 1.x timeout, the time to wait for an action, became how long
             // the task stays open.
@@ -192,12 +194,16 @@ module.exports = function(RED) {
                 title: shared.pick(config.title, msg.title),
                 content: String(content),
                 tag: shared.pick(config.tag || config.event, msg.tag !== undefined ? msg.tag : msg.event),
+                priority: shared.parsePriority(shared.pick(config.priority, msg.priority)),
                 inputs: inputs,
+                links: links && links.map(String),
                 autoCommit: shared.pickBoolean(config.autoCommit !== false, msg.autoCommit),
+                shared: shared.pickBoolean(config.shared, msg.shared),
                 expiresAt: expiresIn !== undefined ? new Date(Date.now() + expiresIn * 1000) : undefined
             });
+            if (shared.pickBoolean(config.markdown, msg.markdown)) { options.contentFormat = 'markdown'; }
             if (files && files.length > 0) {
-                options.files = await Promise.all(files.map(function(url) { return shared.fetchFile(String(url)); }));
+                options.files = await Promise.all(files.map(shared.toFile));
             }
             Object.keys(options).forEach(function(k) {
                 if (options[k] === undefined || options[k] === '' || (Array.isArray(options[k]) && options[k].length === 0)) { delete options[k]; }

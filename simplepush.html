@@ -58,8 +58,12 @@
                 broadcast: {value: false},
                 title: {value: ""},
                 message: {value: ""},
+                markdown: {value: false},
                 tag: {value: ""},
+                priority: {value: ""},
                 expiresIn: {value: ""},
+                shared: {value: false},
+                links: {value: ""},
                 attachments: {value: ""},
                 taskInputs: {value: []},
                 autoCommit: {value: true},
@@ -277,6 +281,10 @@
         <label for="node-input-message"><i class="fa fa-align-left"></i> Message</label>
         <input type="text" id="node-input-message" placeholder="Blank uses msg.payload">
     </div>
+    <div class="form-row">
+        <label for="node-input-markdown">&nbsp;</label>
+        <input type="checkbox" id="node-input-markdown" style="display:inline-block; width:auto; vertical-align:top;"> <label for="node-input-markdown" style="width:auto !important;">Message is Markdown</label>
+    </div>
     <div class="form-row simplepush-inputs-container-row">
         <label style="width:auto;"><i class="fa fa-list"></i> Inputs</label>
         <ol id="simplepush-inputs-list"></ol>
@@ -286,12 +294,31 @@
         <input type="checkbox" id="node-input-autoCommit" style="display:inline-block; width:auto; vertical-align:top;"> <label for="node-input-autoCommit" style="width:auto !important;">Save each input as it is filled, no Submit button</label>
     </div>
     <div class="form-row">
+        <label for="node-input-priority"><i class="fa fa-volume-up"></i> Priority</label>
+        <select id="node-input-priority" style="width:70%">
+            <option value="">Default (3), or msg.priority</option>
+            <option value="1">1: silent</option>
+            <option value="2">2: quiet, status bar icon</option>
+            <option value="3">3: banner with sound</option>
+            <option value="4">4: gets through Focus and Do Not Disturb</option>
+            <option value="5">5: critical, sounds on a muted phone</option>
+        </select>
+    </div>
+    <div class="form-row">
         <label for="node-input-expiresIn"><i class="fa fa-clock-o"></i> Expires in</label>
         <input type="text" id="node-input-expiresIn" placeholder="Seconds until an unanswered task expires; blank uses msg.expiresIn" style="width:70%">
     </div>
     <div class="form-row">
+        <label for="node-input-shared"><i class="fa fa-users"></i> Shared</label>
+        <input type="checkbox" id="node-input-shared" style="display:inline-block; width:auto; vertical-align:top;"> <label for="node-input-shared" style="width:auto !important;">One task for all recipients, the first answer completes it</label>
+    </div>
+    <div class="form-row">
         <label for="node-input-tag"><i class="fa fa-tag"></i> Tag</label>
         <input type="text" id="node-input-tag" placeholder="Blank uses msg.tag">
+    </div>
+    <div class="form-row">
+        <label for="node-input-links"><i class="fa fa-link"></i> Links</label>
+        <input type="text" id="node-input-links" placeholder="Comma separated URLs; blank uses msg.links">
     </div>
     <div class="form-row">
         <label for="node-input-attachments"><i class="fa fa-paperclip"></i> Attachments</label>
@@ -323,19 +350,27 @@
         <dd>The title of the task.</dd>
         <dt class="optional">inputs <span class="property-type">array</span></dt>
         <dd>The inputs of the task, when the node has none. Each entry has a <code>type</code> (<code>actions</code>, <code>text</code>, <code>choice</code>, <code>slider</code>, <code>photo</code>, <code>voiceRecording</code>, <code>file</code>, <code>location</code>), an optional <code>description</code> and <code>required</code> (default <code>true</code>). <code>actions</code> takes <code>actions</code> (labels, or <code>{key, label, style}</code>), <code>choice</code> takes <code>options</code> and optionally <code>multi</code>, <code>minSelections</code>, <code>maxSelections</code>, <code>text</code> takes <code>defaultValue</code>, <code>slider</code> takes <code>min</code>, <code>max</code>, <code>step</code>, <code>unit</code>, <code>defaultValue</code>. Each type at most once.</dd>
+        <dt class="optional">priority <span class="property-type">number</span></dt>
+        <dd>How loudly the push interrupts, 1 (silent) to 5 (critical, sounds on a muted phone). Default 3.</dd>
         <dt class="optional">expiresIn <span class="property-type">number</span></dt>
         <dd>Seconds until an unanswered task expires.</dd>
+        <dt class="optional">shared <span class="property-type">boolean</span></dt>
+        <dd>One task for all recipients instead of one each. The first answer completes it.</dd>
+        <dt class="optional">markdown <span class="property-type">boolean</span></dt>
+        <dd>Render the message as Markdown.</dd>
         <dt class="optional">tag <span class="property-type">string</span></dt>
         <dd>A label the app can group or filter tasks by.</dd>
+        <dt class="optional">links <span class="property-type">array</span></dt>
+        <dd>URLs shown with the task.</dd>
         <dt class="optional">attachments <span class="property-type">array</span></dt>
-        <dd>URLs of files that are downloaded and attached to the task.</dd>
+        <dd>Files attached to the task. Each is a URL to download, or <code>{filename, data, contentType}</code> with <code>data</code> a Buffer.</dd>
         <dt class="optional">autoCommit <span class="property-type">boolean</span></dt>
         <dd>Overrides the node's Auto commit.</dd>
     </dl>
     <p>Values set in the node take precedence over message properties, except checkboxes, where a boolean on the message wins.</p>
 
     <h3>Outputs</h3>
-    <p>A task with inputs sends one message per answer. Sent to a topic or an organization, every recipient gets their own task and answers on their own. With actions set in the node there is one output per action; otherwise answers leave through the first output. Then one output each for tasks that ended without an answer: declined, canceled (withdrawn by the sender) and expired. A task that everyone deleted from their list ends without a message.</p>
+    <p>A task with inputs sends one message per answer. Sent to a topic or an organization, every recipient gets their own task and answers on their own, unless it is shared. With actions set in the node there is one output per action; otherwise answers leave through the first output. Then one output each for tasks that ended without an answer: declined, canceled (withdrawn by the sender) and expired. A task that everyone deleted from their list ends without a message.</p>
     <dl class="message-properties">
         <dt>payload <span class="property-type">object | string</span></dt>
         <dd>The answer, one key per answered input: <code>action</code>, <code>text</code>, <code>choice</code>, <code>choices</code> (several picked), <code>slider</code>, <code>location</code> (<code>latitude</code>, <code>longitude</code>, <code>accuracy</code>, ...), and <code>photo</code>, <code>voice</code>, <code>file</code> as <code>{data, filename, contentType, size}</code> with <code>data</code> a Buffer. On the outputs for tasks without an answer: the status.</dd>
@@ -344,13 +379,13 @@
         <dt>taskId <span class="property-type">string</span></dt>
         <dd>The task that was answered.</dd>
         <dt>groupId <span class="property-type">string</span></dt>
-        <dd>The group of tasks, one per recipient.</dd>
+        <dd>The group of tasks when every recipient got their own.</dd>
         <dt>recipient <span class="property-type">object</span></dt>
         <dd>Who answered: <code>publicId</code>, <code>name</code>. For an organization this is the member.</dd>
         <dt>completedAt <span class="property-type">string</span></dt>
         <dd>When the task was completed.</dd>
         <dt class="optional">declines <span class="property-type">array</span></dt>
-        <dd>On a declined task: who declined, as <code>{recipient, reason, note}</code>.</dd>
+        <dd>On a declined task: who declined, in order, as <code>{recipient, reason, note}</code>. One entry for a task sent to one recipient; everyone on a shared task, which ends declined once all of them declined.</dd>
         <dt class="optional">note <span class="property-type">string</span></dt>
         <dd>The note left when declining, when one person declined.</dd>
     </dl>
