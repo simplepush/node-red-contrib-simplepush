@@ -1,0 +1,114 @@
+<script type="text/javascript">
+    RED.nodes.registerType('simplepush-account', {
+        category: 'config',
+        defaults: {
+            name: {value: ""},
+            account: {value: "personal"}
+        },
+        credentials: {
+            apiToken: {type: "password"},
+            integrationToken: {type: "password"},
+            personalPassword: {type: "password"},
+            topics: {type: "text"}
+        },
+        label: function() {
+            return this.name || (this.account === "organization" ? "Simplepush organization" : "Simplepush");
+        },
+        oneditprepare: function() {
+            var showAccount = function() {
+                var organization = $("#node-config-input-account").val() === "organization";
+                $(".simplepush-personal").toggle(!organization);
+                $(".simplepush-organization").toggle(organization);
+            };
+            showAccount();
+            $("#node-config-input-account").on("change", showAccount);
+
+            var list = $("#node-config-input-topics-list").css("min-height", "120px").editableList({
+                addItem: function(row, index, data) {
+                    var topic = $('<input type="text" class="simplepush-topic" placeholder="Topic" style="width:45%">').appendTo(row);
+                    $('<span> </span>').appendTo(row);
+                    var password = $('<input type="password" class="simplepush-topic-password" placeholder="Password" style="width:45%">').appendTo(row);
+                    topic.val(data.topic || "");
+                    password.val(data.password || "");
+                },
+                removable: true,
+                sortable: false
+            });
+            var topics = [];
+            try {
+                topics = JSON.parse($("#node-config-input-topics").val() || (this.credentials && this.credentials.topics) || "[]");
+            } catch (err) {}
+            topics.forEach(function(t) { list.editableList("addItem", t); });
+        },
+        oneditsave: function() {
+            var topics = [];
+            $("#node-config-input-topics-list").editableList("items").each(function() {
+                var topic = $(this).find(".simplepush-topic").val().trim();
+                var password = $(this).find(".simplepush-topic-password").val();
+                if (topic && password) { topics.push({topic: topic, password: password}); }
+            });
+            // Credentials of the side not in use are cleared, so an account
+            // never holds both tokens.
+            if ($("#node-config-input-account").val() === "organization") {
+                $("#node-config-input-apiToken").val("");
+                $("#node-config-input-personalPassword").val("");
+                topics = [];
+            } else {
+                $("#node-config-input-integrationToken").val("");
+            }
+            // The editor saves the credential from this input.
+            $("#node-config-input-topics").val(JSON.stringify(topics));
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="simplepush-account">
+    <div class="form-row">
+        <label for="node-config-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-config-input-name" placeholder="Name">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-account"><i class="fa fa-id-card"></i> Account</label>
+        <select id="node-config-input-account" style="width:70%">
+            <option value="personal">Personal (API token)</option>
+            <option value="organization">Organization (integration token)</option>
+        </select>
+    </div>
+    <div class="form-row simplepush-personal">
+        <label for="node-config-input-apiToken"><i class="fa fa-key"></i> API Token</label>
+        <input type="password" id="node-config-input-apiToken" placeholder="From the app: Settings > API Token">
+    </div>
+    <div class="form-row simplepush-personal">
+        <label for="node-config-input-personalPassword"><i class="fa fa-lock"></i> Personal Password</label>
+        <input type="password" id="node-config-input-personalPassword" placeholder="Encrypts sends to your own devices and decrypts submissions">
+    </div>
+    <div class="form-row simplepush-personal">
+        <label><i class="fa fa-lock"></i> Topic passwords</label>
+        <input type="hidden" id="node-config-input-topics">
+    </div>
+    <div class="form-row node-input-topics-container-row simplepush-personal">
+        <ol id="node-config-input-topics-list"></ol>
+    </div>
+    <div class="form-row simplepush-organization">
+        <label for="node-config-input-integrationToken"><i class="fa fa-building"></i> Integration Token</label>
+        <input type="password" id="node-config-input-integrationToken" placeholder="From the CLI: sp integration create">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="simplepush-account">
+    <p>A <a href="https://simplepu.sh" target="_blank">Simplepush</a> account. Every Simplepush node that selects it shares one connection.</p>
+    <h3>Personal</h3>
+    <dl class="message-properties">
+        <dt>API Token</dt>
+        <dd>From the app under Settings &gt; API Token.</dd>
+        <dt class="optional">Personal Password</dt>
+        <dd>Your Personal Password from the app. Encrypts tasks and notifications sent to your own devices (no topic) and decrypts your submissions.</dd>
+        <dt class="optional">Topic passwords</dt>
+        <dd>The password of each encrypted topic, as set in the app. A send to a listed topic is encrypted with its password; other topics are sent unencrypted.</dd>
+    </dl>
+    <h3>Organization</h3>
+    <dl class="message-properties">
+        <dt>Integration Token</dt>
+        <dd>An organization admin creates it with the Simplepush CLI: <code>sp integration create</code>. Encryption uses the organization's keys, which come with the token.</dd>
+    </dl>
+</script>

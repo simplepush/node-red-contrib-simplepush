@@ -3,7 +3,10 @@
         category: 'function',
         color: '#ffaaaa',
         defaults: {
+            account: {value:"", type:"simplepush-account", required:true},
             topic: {value:""},
+            member: {value:""},
+            broadcast: {value:false},
             title: {value:""},
             message: {value:""},
             attachments: {value:""},
@@ -20,11 +23,6 @@
             password: {value:""},
             salt: {value:""}
         },
-        credentials: {
-            apiToken: {type:"password"},
-            topicPassword: {type:"password"},
-            personalPassword: {type:"password"}
-        },
         inputs:1,
         outputs:1,
         outputLabels: function(index) {
@@ -40,6 +38,25 @@
             return this.name||"simplepush";
         },
         oneditprepare: function() {
+            // Member and broadcast only exist for an organization account. An
+            // organization send goes to exactly one of topic, member or
+            // broadcast, so broadcast turns the other two off.
+            var isOrganization = function() {
+                var account = RED.nodes.node($("#node-input-account").val());
+                return Boolean(account && account.account === "organization");
+            };
+            var showTarget = function() {
+                var broadcast = isOrganization() && $("#node-input-broadcast").prop("checked");
+                $("#node-input-topic, #node-input-member").prop("disabled", broadcast);
+            };
+            var showAccount = function() {
+                $(".simplepush-organization").toggle(isOrganization());
+                showTarget();
+            };
+            showAccount();
+            $("#node-input-account").on("change", showAccount);
+            $("#node-input-broadcast").on("change", showTarget);
+
             // Flows saved by version 1.x carry the old key, event and
             // password; show them in their new fields.
             if ($("#node-input-topic").val() === "" && this.key) {
@@ -48,8 +65,8 @@
             if ($("#node-input-tag").val() === "" && this.event) {
                 $("#node-input-tag").val(this.event);
             }
-            if (!(this.credentials && this.credentials.has_topicPassword) && this.password) {
-                $("#node-input-topicPassword").val(this.password);
+            if (this.password) {
+                $("#simplepush-legacy-password").show();
             }
             if (this.autoCommit === undefined) {
                 $("#node-input-autoCommit").prop("checked", true);
@@ -73,7 +90,14 @@
             var node = this;
             node.key = "";
             node.event = "";
-            node.password = "";
+            var account = RED.nodes.node($("#node-input-account").val());
+            if (!(account && account.account === "organization")) {
+                $("#node-input-member").val("");
+                $("#node-input-broadcast").prop("checked", false);
+            } else if ($("#node-input-broadcast").prop("checked")) {
+                $("#node-input-topic").val("");
+                $("#node-input-member").val("");
+            }
             node.salt = "";
             var actions = $("#node-input-actions").val();
             if (actions !== "") {
@@ -88,12 +112,20 @@
 
 <script type="text/html" data-template-name="simplepush">
     <div class="form-row">
-        <label for="node-input-apiToken"><i class="fa fa-key"></i> API Token</label>
-        <input type="password" id="node-input-apiToken" placeholder="From the app: Settings > API Token">
+        <label for="node-input-account"><i class="fa fa-user"></i> Account</label>
+        <input type="text" id="node-input-account">
     </div>
     <div class="form-row">
         <label for="node-input-topic"><i class="fa fa-tag"></i> Topic</label>
         <input type="text" id="node-input-topic" placeholder="Leave blank will use msg.topic, or send to your own devices">
+    </div>
+    <div class="form-row simplepush-organization">
+        <label for="node-input-member"><i class="fa fa-user-o"></i> Member</label>
+        <input type="text" id="node-input-member" placeholder="Organization member name; Leave blank will use msg.member">
+    </div>
+    <div class="form-row simplepush-organization">
+        <label for="node-input-broadcast"><i class="fa fa-bullhorn"></i> Broadcast</label>
+        <input type="checkbox" id="node-input-broadcast" style="display:inline-block; width:auto; vertical-align:top;"> <label for="node-input-broadcast" style="width:auto !important;">Send to every member of the organization</label>
     </div>
     <div class="form-row">
         <label for="node-input-title"><i class="fa fa-align-left"></i> Title</label>
@@ -123,18 +155,13 @@
         <label for="node-input-autoCommit"><i class="fa fa-check"></i> Auto commit</label>
         <input type="checkbox" id="node-input-autoCommit" style="display:inline-block; width:auto; vertical-align:top;"> <label for="node-input-autoCommit" style="width:auto !important;">Complete the task as soon as an action is tapped</label>
     </div>
-    <div class="form-row">
-        <label for="node-input-topicPassword"><i class="fa fa-lock"></i> Topic Password</label>
-        <input type="password" id="node-input-topicPassword" placeholder="Password of the topic; Leave blank will use msg.password">
-    </div>
-    <div class="form-row">
-        <label for="node-input-personalPassword"><i class="fa fa-lock"></i> Personal Password</label>
-        <input type="password" id="node-input-personalPassword" placeholder="For encrypted sends to your own devices">
-    </div>
     <br/>
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    <div class="form-tips" id="simplepush-legacy-password" style="display:none">
+        This node still carries the password of a version 1.x flow and encrypts with it. Add the topic and its password to the account, which then takes over.
     </div>
 </script>
 
@@ -146,7 +173,11 @@
         <dt>payload <span class="property-type">string | object</span></dt>
         <dd>The message of the task. Objects are sent as JSON.</dd>
         <dt class="optional">topic <span class="property-type">string</span></dt>
-        <dd>The topic to send to. Without a topic the task goes to your own devices.</dd>
+        <dd>The topic to send to. Without a topic a personal account sends to its own devices.</dd>
+        <dt class="optional">member <span class="property-type">string</span></dt>
+        <dd>Organization only. The member (by name) the task is sent to.</dd>
+        <dt class="optional">broadcast <span class="property-type">boolean</span></dt>
+        <dd>Organization only. <code>true</code> sends the task to every member. An organization send needs exactly one of topic, member or broadcast.</dd>
         <dt class="optional">title <span class="property-type">string</span></dt>
         <dd>The title of the task.</dd>
         <dt class="optional">attachments <span class="property-type">array</span></dt>
@@ -159,12 +190,6 @@
         <dd>Seconds to wait for an action before raising a timeout error. The task expires on the device at the same time. 0 (the default) waits forever.</dd>
         <dt class="optional">autoCommit <span class="property-type">boolean</span></dt>
         <dd>Overrides the Auto commit setting. <code>true</code> completes the task as soon as an action is tapped, <code>false</code> shows a Submit button.</dd>
-        <dt class="optional">password <span class="property-type">string</span></dt>
-        <dd>The topic's password (set in the app) for an encrypted task to a topic.</dd>
-        <dt class="optional">personalPassword <span class="property-type">string</span></dt>
-        <dd>Your Personal Password (set in the app) for an encrypted task to your own devices.</dd>
-        <dt class="optional">apiToken <span class="property-type">string</span></dt>
-        <dd>Overrides the API token from the node config.</dd>
     </dl>
 
     <h3>Outputs</h3>
@@ -177,10 +202,10 @@
         <dt>actionSelectedAt <span class="property-type">string</span></dt>
         <dd>When the action was tapped (ISO 8601).</dd>
         <dt>recipient <span class="property-type">object</span></dt>
-        <dd>Who answered (<code>publicId</code>, <code>name</code>).</dd>
+        <dd>Who answered (<code>publicId</code>, <code>name</code>). For an organization this is the member.</dd>
     </dl>
 
     <h3>Details</h3>
     <p>Values set in the node config take precedence over the message properties, except <code>msg.autoCommit</code>, which overrides the checkbox.</p>
-    <p>Create the API token in the Simplepush app under Settings &gt; API Token. Topics, topic passwords and the Personal Password are managed in the app as well. A task to a topic is encrypted with the topic password, a task to your own devices with the Personal Password.</p>
+    <p>The API token or organization integration token, the topic passwords and the Personal Password are set in the Simplepush account the node uses.</p>
 </script>

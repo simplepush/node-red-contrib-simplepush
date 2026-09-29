@@ -21,6 +21,7 @@
   "node-red": {
     "version": ">=3.0.0",
     "nodes": {
+      "simplepush-account": "simplepush-account.js",
       "simplepush": "simplepush.js"
     }
   },
