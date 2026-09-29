@@ -23,7 +23,8 @@
     "nodes": {
       "simplepush-account": "simplepush-account.js",
       "simplepush": "simplepush.js",
-      "simplepush-notification": "simplepush-notification.js"
+      "simplepush-notification": "simplepush-notification.js",
+      "simplepush-in": "simplepush-in.js"
     }
   },
   "engines": {

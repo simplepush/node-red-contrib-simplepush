@@ -1,0 +1,46 @@
+<script type="text/javascript">
+    RED.nodes.registerType('simplepush-in', {
+        category: 'network',
+        color: '#ffaaaa',
+        paletteLabel: 'simplepush in',
+        defaults: {
+            name: {value: ""},
+            account: {value: "", type: "simplepush-account", required: true}
+        },
+        inputs: 0,
+        outputs: 1,
+        outputLabels: ["submission"],
+        icon: "simplepush.svg",
+        label: function() {
+            return this.name || "simplepush submissions";
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="simplepush-in">
+    <div class="form-row">
+        <label for="node-input-account"><i class="fa fa-user"></i> Account</label>
+        <input type="text" id="node-input-account">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-pencil"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="simplepush-in">
+    <p>Sends a message for every <a href="https://simplepu.sh" target="_blank">Simplepush</a> submission: text, a photo, a file, an audio clip or a location that someone sends from the app on their own, without a task. For an organization these are the members' submissions.</p>
+    <p>Submissions to a personal account are decrypted with the Personal Password set in the account.</p>
+
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object</span></dt>
+        <dd>What was sent: <code>text</code>, <code>location</code> (<code>latitude</code>, <code>longitude</code>, <code>accuracy</code>, ...), and <code>photo</code>, <code>file</code>, <code>audio</code> as <code>{data, filename, contentType, size}</code> with <code>data</code> a Buffer.</dd>
+        <dt>sender <span class="property-type">object</span></dt>
+        <dd>Who sent it: <code>publicId</code>, <code>name</code>.</dd>
+        <dt>submissionId <span class="property-type">string</span></dt>
+        <dd>The submission's id.</dd>
+        <dt>submittedAt <span class="property-type">string</span></dt>
+        <dd>When it was sent.</dd>
+    </dl>
+</script>
